@@ -1,34 +1,78 @@
-# AVR Bare-metal ADC sampler + SSD1306 display
+![project](/rogowoski_project.png)
+# Rogowski Coil–Based Current Sensor with Edge Connectivity
 
-This small project targets the ATmega328P (e.g. Arduino Uno MCU) and:
-- Samples ADC0 at 1 kHz for 30 ms (30 samples)
-- Finds the maximum ADC reading and converts it to voltage assuming AVcc = 5.0V
-- Displays the result on an SSD1306 128x64 OLED via I2C with scaled/big digits
+This project implements a **non-invasive current measurement system** based on a **Rogowski coil**, combined with embedded digital signal processing and wireless data transmission. The system measures **peak current, RMS current, and frequency** of an AC signal and publishes the results to an **MQTT broker** for real-time edge visualization.
 
-Files added:
-- `src/main.c` - application logic, Timer1 + ADC setup
-- `src/i2c.c`, `src/i2c.h` - basic TWI (I2C) routines
-- `src/ssd1306.c`, `src/ssd1306.h` - SSD1306 framebuffer, init and big-digit draw
-- `src/fonts.h` - 5x7 digit glyphs used for scaling
+The project demonstrates a complete **cyber-physical system (CPS)** pipeline, spanning analog sensing, bare-metal firmware, digital signal processing, wireless communication, and edge-side visualization.
 
-Wiring (example for I2C SSD1306):
-- Connect `SDA` -> `PC4` (A4)
-- Connect `SCL` -> `PC5` (A5)
-- Connect GND and VCC (check module voltage: many modules are 3.3V tolerant or 5V tolerant)
+---
 
-Build (avr-gcc / avrdude):
+## Key Features
 
-```bash
-avr-gcc -mmcu=atmega328p -DF_CPU=16000000UL -Os -I./src -o build/main.elf src/main.c src/i2c.c src/ssd1306.c
-avr-objcopy -O ihex -R .eeprom build/main.elf build/main.hex
-# then flash with avrdude (adjust programmer and port):
-avrdude -c arduino -p m328p -P /dev/ttyUSB0 -b 115200 -U flash:w:build/main.hex
-```
+- Non-invasive current sensing using a **hand-wound Rogowski coil**
+- Wide bandwidth measurement without magnetic saturation
+- **Bare-metal firmware** on ATmega328P (no Arduino / RTOS)
+- Fixed-point **FIR filtering** and **digital integration**
+- Peak, RMS, and frequency estimation
+- Real-time OLED display (SSD1306)
+- **SPI communication** between ATmega328P and ESP8266
+- **Wi-Fi + MQTT** data publishing using ESP8266 (ESP_RTOS_SDK)
+- **Edge visualization** using Python and Matplotlib
 
-Notes:
-- The code assumes `F_CPU = 16MHz` and AVcc as 5.0V. Adjust if your board differs.
-- The SSD1306 driver here is minimal and uses the hardware TWI peripheral.
-- The big-font rendering scales a 5x7 digits font by an integer scale. It only reliably handles digits, '.' and '-'.
-- `dtostrf` (avr-libc) is used to format floats.
+---
+### visualization app 
+ - edge_listener.py
+ 
+## System Architecture
 
-If you want: I can wire up a full Makefile that integrates compilation and avrdude flashing, or extend the font set to support arbitrary ASCII characters.
+### Hardware Blocks
+
+- **Rogowski Coil + Signal Conditioning**  
+  Produces a small voltage proportional to `di/dt`, followed by amplification and conditioning.
+
+- **ATmega328P (16 MHz)**  
+  Performs ADC sampling, FIR filtering, digital integration, current calculation, frequency estimation, and display control.
+
+- **SSD1306 OLED (128×32, I²C)**  
+  Displays peak current, RMS current, and frequency locally.
+
+- **ESP8266**  
+  Acts as an SPI slave, connects to Wi-Fi, and publishes data via MQTT.
+
+- **Edge Device (PC)**  
+  Subscribes to MQTT data and visualizes it in real time using Python.
+
+---
+
+## Firmware Overview
+
+### ATmega328P (Bare-Metal)
+
+- Written in **register-level C** for deterministic behavior
+- No Arduino framework or operating system
+- Timer-driven ADC sampling at **1 kHz**
+- 31-tap **FIR low-pass filter** implemented using **Q15 fixed-point arithmetic**
+- Digital integration using Forward Euler method
+- Zero-crossing based frequency estimation
+- SPI master for data transfer to ESP8266
+
+Source files:
+
+- `main.c` – System initialization and main loop  
+- `adc.c / adc.h` – ADC configuration and sampling  
+- `timer.c / timer.h` – Timer-based sampling control  
+- `fir.c / fir.h` – FIR filter implementation  
+- `spi.c / spi.h` – SPI communication with ESP8266  
+- `i2c.c / i2c.h` – I²C driver  
+- `ssd1306.c / ssd1306.h` – OLED driver  
+
+---
+
+### ESP8266 (ESP_RTOS_SDK)
+
+- Configured as **SPI slave**
+- Receives current and frequency values from ATmega328P
+- Connects to Wi-Fi network
+- Publishes measurements via **MQTT** in **JSON format**
+
+

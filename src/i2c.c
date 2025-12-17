@@ -1,7 +1,7 @@
 #include "i2c.h"
 #include <avr/io.h>
 
-// Basic blocking TWI (I2C) routines for 100kHz
+// Basic blocking I2C routines for 100kHz
 void twi_init(void) {
     // SCL frequency = F_CPU / (16 + 2*TWBR*prescaler)
     // prescaler = 1
@@ -23,5 +23,5 @@ void twi_write(uint8_t data) {
 
 void twi_stop(void) {
     TWCR = (1<<TWINT)|(1<<TWEN)|(1<<TWSTO);
-    // no wait for TWSTO to clear
+    
 }
